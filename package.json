@@ -1,0 +1,173 @@
+{
+  "name": "efsoft-omr-software",
+  "private": true,
+  "version": "1.0.0",
+  "description": "EFSoft OMR Software - Complete desktop application for optical mark recognition",
+  "type": "module",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "concurrently \"python pServer/main.py\" \"npm run dev:client\"",
+    "dev:client": "vite",
+    "dev:server": "cd pServer && python main.py",
+    "build": "vite build",
+    "build:backend": "node build-backend.cjs",
+    "build:electron": "electron-builder",
+    "lint": "eslint .",
+    "preview": "vite preview",
+    "electron": "electron .",
+    "electron:dev": "concurrently \"npm run dev:server\" \"npm run dev:client\" \"wait-on http://localhost:3001 http://localhost:5173 && electron .\"",
+    "dist": "npm run build && npm run build:backend && electron-builder",
+    "dist:win": "npm run build && npm run build:backend && electron-builder --win",
+    "dist:mac": "npm run build && npm run build:backend && electron-builder --mac",
+    "dist:linux": "npm run build && npm run build:backend && electron-builder --linux"
+  },
+  "dependencies": {
+    "@assemblyscript/loader": "^0.28.3",
+    "adm-zip": "^0.5.16",
+    "archiver": "^7.0.1",
+    "axios": "^1.10.0",
+    "chart.js": "^4.5.0",
+    "cors": "^2.8.5",
+    "csv-parser": "^3.2.0",
+    "date-fns": "^4.1.0",
+    "exceljs": "^4.4.0",
+    "express": "^4.21.2",
+    "html2canvas": "^1.4.1",
+    "jimp": "^1.6.0",
+    "jspdf": "^3.0.1",
+    "lucide-react": "^0.344.0",
+    "mongoose": "^8.16.3",
+    "multer": "^1.4.5-lts.2",
+    "node-fetch": "^3.3.2",
+    "nodemon": "^3.1.10",
+    "opencv-wasm": "^4.3.0-10",
+    "papaparse": "^5.5.3",
+    "pdf-parse": "^1.1.1",
+    "pdf2pic": "^3.2.0",
+    "pdfkit": "^0.15.2",
+    "react": "^18.3.1",
+    "react-chartjs-2": "^5.3.0",
+    "react-dom": "^18.3.1",
+    "react-dropzone": "^14.3.8",
+    "react-router-dom": "^7.6.3",
+    "tesseract.js": "^6.0.1",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.28.3",
+    "@babel/preset-env": "^7.28.3",
+    "@babel/preset-react": "^7.27.1",
+    "@electron/notarize": "^2.5.0",
+    "@eslint/js": "^9.31.0",
+    "@types/react": "^18.3.23",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^4.6.0",
+    "autoprefixer": "^10.4.21",
+    "babel-loader": "^10.0.0",
+    "concurrently": "^7.6.0",
+    "css-loader": "^7.1.2",
+    "electron": "^37.3.1",
+    "electron-builder": "^25.1.8",
+    "eslint": "^9.31.0",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.20",
+    "file-loader": "^6.2.0",
+    "globals": "^15.15.0",
+    "html-webpack-plugin": "^5.6.4",
+    "postcss": "^8.5.6",
+    "style-loader": "^4.0.0",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.36.0",
+    "uuid": "^11.1.0",
+    "vite": "^7.1.3",
+    "wait-on": "^8.0.3",
+    "webpack": "^5.101.3",
+    "webpack-cli": "^6.0.1"
+  },
+  "build": {
+    "appId": "com.efsoft.omr",
+    "productName": "EFSoft OMR Software",
+    "compression": "maximum",
+    "directories": {
+      "output": "dist-electron",
+      "buildResources": "build-resources"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json",
+      "!pServer/**/*",
+      "!src/**/*",
+      "!*.md",
+      "!*.log"
+    ],
+    "extraResources": [
+      {
+        "from": "pServer/dist/*",
+        "to": "python-backend/",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "afterSign": "scripts/notarize.cjs",
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "category": "public.app-category.education",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build-resources/entitlements.mac.plist",
+      "entitlementsInherit": "build-resources/entitlements.mac.plist"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64",
+            "ia32"
+          ]
+        }
+      ],
+      "publisherName": "EFSoft",
+      "verifyUpdateCodeSignature": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "EFSoft OMR"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "Education"
+    },
+    "publish": {
+      "provider": "generic",
+      "url": "https://your-update-server.com/"
+    }
+  }
+}
