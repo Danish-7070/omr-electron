@@ -174,16 +174,30 @@ function createWindow() {
 
   // Start services and then load the main app
   startServices().then(() => {
-    const startUrl = isDev 
-      ? 'http://localhost:5173' 
-      : `file://${path.join(__dirname, '../dist/index.html')}`;
+    if (isDev) {
+      // Development mode - load from Vite dev server
+      mainWindow.loadURL('http://localhost:5173');
+      mainWindow.webContents.openDevTools();
+    } else {
+      // Production mode - load from built files
+      const indexPath = path.join(__dirname, '../dist/index.html');
+      console.log('Loading production build from:', indexPath);
       
-    mainWindow.loadURL(startUrl);
-mainWindow.webContents.openDevTools();
+      // Check if the file exists
+      if (fs.existsSync(indexPath)) {
+        mainWindow.loadFile(indexPath);
+      } else {
+        console.error('Production build not found at:', indexPath);
+        dialog.showErrorBox(
+          'Build Error',
+          'Production build not found. Please run "npm run build" first.'
+        );
+      }
+    }
+  }).catch((error) => {
     if (isDev) {
       mainWindow.webContents.openDevTools();
     }
-  }).catch((error) => {
     console.error('Failed to start services:', error);
     dialog.showErrorBox(
       'Startup Error',

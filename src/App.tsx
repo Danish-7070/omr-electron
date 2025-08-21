@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext, createContext } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Navigation } from './components/Navigation';
 import { Dashboard } from './pages/Dashboard';
 import { ExamCreation } from './pages/ExamCreation';

@@ -1,8 +1,30 @@
 import React, { createContext, useContext, ReactNode } from 'react';
 import axios from 'axios';
 
-// Use local backend for desktop app
-const API_BASE_URL = 'http://localhost:3001/api';
+// Extend the Window interface to include electronAPI
+declare global {
+  interface Window {
+    electronAPI?: any;
+  }
+}
+
+// Determine API base URL based on environment
+const getApiBaseUrl = () => {
+  // Check if we're in Electron
+  if (typeof window !== 'undefined' && window.electronAPI) {
+    return 'http://localhost:3001/api';
+  }
+  
+  // For web builds, use relative path or localhost
+  if (import.meta.env.DEV) {
+    return 'http://localhost:3001/api';
+  }
+  
+  // Production build - assume backend is on same host
+  return 'http://localhost:3001/api';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 interface ApiContextType {
   api: axios.AxiosInstance;
