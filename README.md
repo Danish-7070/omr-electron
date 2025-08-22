@@ -1,22 +1,24 @@
 # EFSoft OMR Software - Desktop Application
 
-A complete cross-platform desktop application for Optical Mark Recognition (OMR) processing, built with Electron, React, and Python.
+A complete cross-platform desktop application for Optical Mark Recognition (OMR) processing, built with Electron, React, and Python with direct IPC communication.
 
 ## Features
 
 - **Cross-platform**: Runs on Windows, macOS, and Linux
-- **Offline operation**: No internet connection required
-- **Local database**: Uses local MongoDB for data storage
+- **Offline operation**: No internet connection or ports required
+- **Local database**: Uses local SQLite for data storage
 - **Advanced OMR processing**: Computer vision-based bubble detection
 - **Complete workflow**: Exam creation, student management, scanning, and results
 - **Export capabilities**: PDF and Excel report generation
+- **Direct IPC**: No HTTP server required - direct communication between frontend and backend
 
 ## Architecture
 
 - **Frontend**: React with TypeScript and Tailwind CSS
-- **Backend**: Python FastAPI with OpenCV for image processing
-- **Database**: Local MongoDB instance
+- **Backend**: Python bridge with OpenCV for image processing
+- **Database**: Local SQLite database
 - **Desktop wrapper**: Electron for cross-platform compatibility
+- **Communication**: Direct IPC between Electron and Python bridge
 
 ## Development Setup
 
@@ -24,7 +26,6 @@ A complete cross-platform desktop application for Optical Mark Recognition (OMR)
 
 - Node.js 16+ and npm
 - Python 3.8+ with pip
-- MongoDB (for development)
 
 ### Installation
 
@@ -46,7 +47,7 @@ pip install -r requirements.txt
 cd ..
 ```
 
-4. Start development servers:
+4. Start development:
 ```bash
 npm run electron:dev
 ```
@@ -54,7 +55,7 @@ npm run electron:dev
 This will start:
 - Python backend on http://localhost:3001
 - React frontend on http://localhost:5173
-- Electron app with both services
+- Electron app with direct Python bridge communication
 
 ## Building for Production
 
@@ -64,7 +65,7 @@ This will start:
 npm run build:backend
 ```
 
-This creates a standalone executable using PyInstaller.
+This creates a standalone Python bridge executable using PyInstaller.
 
 ### Build Desktop Application
 
@@ -85,6 +86,7 @@ npm run dist:linux  # Linux
 ```
 ├── electron/           # Electron main process
 │   ├── main.js        # Main Electron process
+│   ├── python-bridge.cjs # Python bridge communication
 │   ├── preload.js     # Preload script
 │   └── loading.html   # Loading screen
 ├── src/               # React frontend
@@ -93,6 +95,7 @@ npm run dist:linux  # Linux
 │   ├── context/       # React context providers
 │   └── main.tsx       # Entry point
 ├── pServer/           # Python backend
+│   ├── bridge.py      # Python bridge for IPC
 │   ├── main.py        # FastAPI application
 │   ├── models/        # Pydantic models
 │   ├── routers/       # API route handlers
@@ -123,7 +126,7 @@ npm run dist:linux  # Linux
 
 ## Database
 
-The application uses a local MongoDB instance that starts automatically with the desktop app. Data is stored locally in the user's application data directory.
+The application uses a local SQLite database that is created automatically with the desktop app. Data is stored locally in the user's application data directory.
 
 ## Security
 
@@ -134,10 +137,10 @@ The application uses a local MongoDB instance that starts automatically with the
 
 ## Troubleshooting
 
-### MongoDB Connection Issues
-- Ensure MongoDB is installed (for development)
-- Check if port 27017 is available
-- Verify MongoDB service is running
+### Database Connection Issues
+- Check if SQLite database file is accessible
+- Verify write permissions in user data directory
+- Ensure database file is not corrupted
 
 ### Python Backend Issues
 - Ensure all Python dependencies are installed
@@ -147,7 +150,7 @@ The application uses a local MongoDB instance that starts automatically with the
 ### Build Issues
 - Ensure PyInstaller is installed
 - Check platform-specific build requirements
-- Verify code signing certificates (for distribution)
+- Verify all Python dependencies are bundled correctly
 
 ## License
 

@@ -1,151 +1,23 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
-const { spawn } = require('child_process');
 const fs = require('fs');
-const net = require('net');
+const PythonBridge = require('./python-bridge.cjs');
 
 const isDev = process.env.NODE_ENV === 'development';
 const isPackaged = app.isPackaged;
 
 let mainWindow;
-let pythonProcess = null;
+let pythonBridge = null;
 
-// Paths for packaged application
-const getResourcePath = (relativePath) => {
-  if (isPackaged) {
-    return path.join(process.resourcesPath, 'app', relativePath);
-  }
-  return path.join(__dirname, '..', relativePath);
-};
-
-const getPythonExecutablePath = () => {
-  if (isPackaged) {
-    const platform = process.platform;
-    if (platform === 'win32') {
-      return path.join(process.resourcesPath, 'python-backend', 'main.exe');
-    } else if (platform === 'darwin') {
-      return path.join(process.resourcesPath, 'python-backend', 'main');
-    } else {
-      return path.join(process.resourcesPath, 'python-backend', 'main');
-    }
-  }
-  return 'python'; // Development mode
-};
-
-// Check if port is available
-const isPortAvailable = (port) => {
-  return new Promise((resolve) => {
-    const server = net.createServer();
-    server.listen(port, () => {
-      server.once('close', () => resolve(true));
-      server.close();
-    });
-    server.on('error', () => resolve(false));
-  });
-};
-
-// Wait for service to be ready
-const waitForService = (port, timeout = 30000) => {
-  return new Promise((resolve, reject) => {
-    const startTime = Date.now();
-    
-    const checkConnection = () => {
-      const socket = new net.Socket();
-      
-      socket.setTimeout(1000);
-      socket.on('connect', () => {
-        socket.destroy();
-        resolve(true);
-      });
-      
-      socket.on('timeout', () => {
-        socket.destroy();
-        checkAgain();
-      });
-      
-      socket.on('error', () => {
-        checkAgain();
-      });
-      
-      socket.connect(port, 'localhost');
-    };
-    
-    const checkAgain = () => {
-      if (Date.now() - startTime > timeout) {
-        reject(new Error(`Service on port ${port} did not start within ${timeout}ms`));
-      } else {
-        setTimeout(checkConnection, 1000);
-      }
-    };
-    
-    checkConnection();
-  });
-};
-
-// Start Python backend
-const startPythonBackend = async () => {
-  console.log('Starting Python backend...');
-  
+// Initialize Python Bridge
+const initializePythonBridge = async () => {
   try {
-    // Check if backend is already running
-    const backendAvailable = await isPortAvailable(3001);
-    if (!backendAvailable) {
-      console.log('Backend is already running on port 3001');
-      return true;
-    }
-
-    const pythonPath = getPythonExecutablePath();
-    let pythonArgs = [];
-
-    if (!isPackaged) {
-      // Development mode
-      pythonArgs = [path.join(__dirname, '..', 'pServer', 'main.py')];
-    }
-
-    // Set environment variables (SQLite path in user data for persistence)
-    const dbPath = path.join(app.getPath('userData'), 'omr_database.db');
-    const env = {
-      ...process.env,
-      DATABASE_PATH: dbPath,
-      PORT: '3001',
-      NODE_ENV: 'production'
-    };
-
-    pythonProcess = spawn(pythonPath, pythonArgs, {
-      stdio: isDev ? 'inherit' : 'ignore',
-      env: env,
-      detached: false,
-      cwd: isPackaged ? path.dirname(pythonPath) : path.join(__dirname, '..', 'pServer')
-    });
-
-    pythonProcess.on('error', (error) => {
-      console.error('Python process error:', error);
-      if (error.code === 'ENOENT') {
-        console.log('Python backend executable not found.');
-      }
-    });
-
-    pythonProcess.on('exit', (code) => {
-      console.log(`Python backend process exited with code ${code}`);
-      pythonProcess = null;
-    });
-
-    // Wait for backend to be ready
-    await waitForService(3001, 30000);
-    console.log('Python backend started successfully');
+    pythonBridge = new PythonBridge();
+    await pythonBridge.initialize(isDev);
+    console.log('Python bridge initialized successfully');
     return true;
-
   } catch (error) {
-    console.error('Failed to start Python backend:', error);
-    
-    // Show error dialog to user
-    if (mainWindow) {
-      dialog.showErrorBox(
-        'Backend Error', 
-        'Failed to start the application backend. The application may not function properly.\n\n' +
-        'Error: ' + error.message
-      );
-    }
+    console.error('Failed to initialize Python bridge:', error);
     return false;
   }
 };
@@ -165,44 +37,37 @@ function createWindow() {
     },
     titleBarStyle: 'default',
     icon: path.join(__dirname, 'assets', 'icon.png'),
-    show: false // Don't show until ready
+    show: false
   });
 
   // Show loading screen
   mainWindow.loadFile(path.join(__dirname, 'loading.html'));
   mainWindow.show();
 
-  // Start services and then load the main app
-  startServices().then(() => {
-    if (isDev) {
-      // Development mode - load from Vite dev server
-      mainWindow.loadURL('http://localhost:5173');
-      mainWindow.webContents.openDevTools();
-    } else {
-      // Production mode - load from built files
-      const indexPath = path.join(__dirname, '../dist/index.html');
-      console.log('Loading production build from:', indexPath);
-      
-      // Check if the file exists
-      if (fs.existsSync(indexPath)) {
-        mainWindow.loadFile(indexPath);
+  // Initialize Python bridge and then load the main app
+  initializePythonBridge().then((success) => {
+    if (success) {
+      if (isDev) {
+        mainWindow.loadURL('http://localhost:5173');
+        mainWindow.webContents.openDevTools();
       } else {
-        console.error('Production build not found at:', indexPath);
-        dialog.showErrorBox(
-          'Build Error',
-          'Production build not found. Please run "npm run build" first.'
-        );
+        const indexPath = path.join(__dirname, '../dist/index.html');
+        if (fs.existsSync(indexPath)) {
+          mainWindow.loadFile(indexPath);
+        } else {
+          console.error('Production build not found at:', indexPath);
+          dialog.showErrorBox(
+            'Build Error',
+            'Production build not found. Please run "npm run build" first.'
+          );
+        }
       }
+    } else {
+      dialog.showErrorBox(
+        'Initialization Error',
+        'Failed to initialize the application backend. Please try restarting the application.'
+      );
     }
-  }).catch((error) => {
-    if (isDev) {
-      mainWindow.webContents.openDevTools();
-    }
-    console.error('Failed to start services:', error);
-    dialog.showErrorBox(
-      'Startup Error',
-      'Failed to start application services. Please check the logs and try again.'
-    );
   });
 
   mainWindow.on('closed', () => {
@@ -210,29 +75,13 @@ function createWindow() {
   });
 }
 
-// Start all services
-const startServices = async () => {
-  try {
-    console.log('Starting application services...');
-    
-    // Start Python backend (SQLite is file-based, no separate server needed)
-    await startPythonBackend();
-    
-    console.log('All services started successfully');
-  } catch (error) {
-    console.error('Failed to start services:', error);
-    throw error;
-  }
-};
-
 // Cleanup processes
 const cleanup = () => {
   console.log('Cleaning up processes...');
   
-  if (pythonProcess) {
-    console.log('Terminating Python backend...');
-    pythonProcess.kill('SIGTERM');
-    pythonProcess = null;
+  if (pythonBridge) {
+    pythonBridge.terminate();
+    pythonBridge = null;
   }
 };
 
@@ -261,7 +110,56 @@ process.on('SIGINT', cleanup);
 process.on('SIGTERM', cleanup);
 process.on('exit', cleanup);
 
-// IPC handlers
+// IPC handlers for Python bridge communication
+ipcMain.handle('python-call', async (event, method, params) => {
+  if (!pythonBridge) {
+    throw new Error('Python bridge not initialized');
+  }
+
+  try {
+    switch (method) {
+      case 'create_exam':
+        return await pythonBridge.createExam(params);
+      case 'get_exams':
+        return await pythonBridge.getExams();
+      case 'get_exam':
+        return await pythonBridge.getExam(params.examId);
+      case 'upload_students':
+        return await pythonBridge.uploadStudents(params.examId, params.studentsData);
+      case 'get_students':
+        return await pythonBridge.getStudents(params.examId);
+      case 'upload_solution':
+        return await pythonBridge.uploadSolution(params.examId, params.solutionsData);
+      case 'get_solution':
+        return await pythonBridge.getSolution(params.examId);
+      case 'process_omr_image':
+        return await pythonBridge.processOMRImage(params.examId, params.imageData, params.studentId);
+      case 'batch_process_omr':
+        return await pythonBridge.batchProcessOMR(params.examId, params.imagesData);
+      case 'save_result':
+        return await pythonBridge.saveResult(params);
+      case 'get_results':
+        return await pythonBridge.getResults(params.examId);
+      case 'get_all_results':
+        return await pythonBridge.getAllResults();
+      case 'generate_omr_sheets':
+        return await pythonBridge.generateOMRSheets(params.examId);
+      case 'download_omr_sheets':
+        return await pythonBridge.downloadOMRSheets(params.examId);
+      case 'get_settings':
+        return await pythonBridge.getSettings();
+      case 'update_settings':
+        return await pythonBridge.updateSettings(params);
+      default:
+        throw new Error(`Unknown method: ${method}`);
+    }
+  } catch (error) {
+    console.error(`Error calling Python method ${method}:`, error);
+    throw error;
+  }
+});
+
+// Other IPC handlers
 ipcMain.handle('get-app-version', () => {
   return app.getVersion();
 });
